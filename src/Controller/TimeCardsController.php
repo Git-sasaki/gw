@@ -130,9 +130,14 @@ class TimeCardsController extends AppController
        $attendance->kekkin = $kekkin[$i];
        $attendance->bikou = $bikou[$i];
        $attendance->remote = $remote[$i];
+       
+       // 利用者のA型/B型情報を記録（0=A型、1=B型）
        if ($userData["adminfrag"] == 0) {
+           $attendance->user_type = $userData["wrkCase"];
            $attendance->ou = $ou[$i];
            $attendance->fuku = $fuku[$i];
+       } else {
+           $attendance->user_type = null; // 職員の場合はnull
        }
 
        if($attendanceTable->save($attendance)) {
@@ -305,6 +310,13 @@ class TimeCardsController extends AppController
         $attendance->paid = $paid[$i];
         $attendance->kekkin = $kekkin[$i];
         $attendance->remote = $remote[$i];
+        
+        // 利用者のA型/B型情報を記録（0=A型、1=B型）
+        if ($userData["adminfrag"] == 0) {
+            $attendance->user_type = $userData["wrkCase"];
+        } else {
+            $attendance->user_type = null; // 職員の場合はnull
+        }
         $attendanceTable->save($attendance);
 
         // 送迎記録の追加または削除

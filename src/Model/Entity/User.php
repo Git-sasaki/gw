@@ -10,6 +10,8 @@ use Cake\ORM\Entity;
  * @property string $user
  * @property string|null $name
  * @property string $password
+ * @property int|null $wrkCase
+ * @property int|null $adminfrag
  * @property \Cake\I18n\FrozenTime|null $created
  * @property \Cake\I18n\FrozenTime|null $modified
  */
@@ -28,6 +30,8 @@ class User extends Entity
         'user' => true,
         'name' => true,
         'password' => true,
+        'wrkCase' => true,
+        'adminfrag' => true,
         'created' => true,
         'modified' => true,
     ];

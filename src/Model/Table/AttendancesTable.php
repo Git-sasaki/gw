@@ -73,6 +73,10 @@ class AttendancesTable extends Table
             ->integer('user_type')
             ->allowEmptyString('user_type');
 
+        $validator
+            ->integer('user_id')
+            ->notEmptyString('user_id', 'ユーザーIDは必須です');
+
         return $validator;
     }
 

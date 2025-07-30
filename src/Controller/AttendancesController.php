@@ -81,9 +81,11 @@ class AttendancesController extends AppController
             
             // 利用者のA型/B型情報を記録（0=A型、1=B型）
             if ($user->adminfrag == 0) {
+                // 利用者の場合、wrkCaseの値を記録
                 $attendance->user_type = $user->wrkCase;
             } else {
-                $attendance->user_type = null; // 職員の場合はnull
+                // 職員の場合はnullを設定
+                $attendance->user_type = null;
             }
             
         if(!empty($results["medical"])) {

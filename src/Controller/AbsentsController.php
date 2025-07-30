@@ -152,6 +152,7 @@ class AbsentsController extends AppController
         // ログイン判定
         $auser = $this->Auth->user();
         $attendanceTable = TableRegistry::get('Attendances');
+        $usersTable = TableRegistry::get('Users');
         if(is_null($auser)){
             // ログインしていない場合
             $this->Flash->error('ログインしていません');
@@ -200,6 +201,7 @@ class AbsentsController extends AppController
                 } else {
                     $attendances = $attendanceTable->newentity();
                 }
+                $attendances->user_id = $data["user_id"]; // user_idを設定
                 $attendances->date = $postdate;
                 $attendances->remote = 0;
                 $attendances->medical = 0;
@@ -207,6 +209,14 @@ class AbsentsController extends AppController
                 $attendances->kekkin = 1;
                 if(empty($att["user_staffid"])) {
                     $attendances->user_staffid = $auser["id"];
+                }
+                
+                // 利用者のA型/B型情報を記録（0=A型、1=B型）
+                $userData = $usersTable->find()->where(['Users.id' => $data["user_id"]])->first();
+                if ($userData && $userData->adminfrag == 0) {
+                    $attendances->user_type = $userData->wrkCase;
+                } else {
+                    $attendances->user_type = null; // 職員の場合はnull
                 }
                 if($attendanceTable->save($attendances)) {
                     $this->Flash->success(__('保存されました'));
