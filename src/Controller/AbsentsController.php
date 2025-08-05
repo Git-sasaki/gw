@@ -152,8 +152,8 @@ class AbsentsController extends AppController
         // ログイン判定
         $auser = $this->Auth->user();
         $attendanceTable = TableRegistry::get('Attendances');
-        $usersTable = TableRegistry::get('Users');
-        if(is_null($auser)){
+        $usersTable = TableRegistry::get('Users');  
+        if(is_null($auser)) {    
             // ログインしていない場合
             $this->Flash->error('ログインしていません');
             return $this->redirect(['controller' => 'users', 'action' => 'login']);
@@ -161,17 +161,19 @@ class AbsentsController extends AppController
             $data = $this->request->getData();
             $postdate = $data["kekkinyear"]."-".$data["kekkinmonth"]."-".$data["kekkindate"];
             $uketsuke = $data["year"]."-".$data["month"]."-".$data["date"];
-            if (!empty($data["id"])) {
-                $abs = $this->Absents
-                ->find()
-                ->where(["Absents.id" => $data["id"], "Absents.user_id" => $data["user_id"]])
-                ->first();
+            LOG::debug("データチェック");
+            LOG::debug($data);
+            $abs = $this->Absents
+            ->find()
+            ->where(["Absents.date" => $postdate, "Absents.user_id" => $data["user_id"]])
+            ->first();
 
-                $att = $attendanceTable
-                ->find()
-                ->where(["Attendances.date" => $abs["kekkindate"], "Attendances.user_id" => $data["user_id"]])
-                ->first();
-            }
+            LOG::debug("attendace レコードチェック");
+            $att = $attendanceTable
+            ->find()
+            ->where(["Attendances.date" => $postdate, "Attendances.user_id" => $data["user_id"]])
+            ->first();
+            LOG::debug($att);
 
             if(!empty($abs)) {
                 $absents = $this->Absents->get($abs['id']);
@@ -197,8 +199,11 @@ class AbsentsController extends AppController
 
             if($this->Absents->save($absents)) {
                 if(!empty($att)) {
+                    LOG::debug("レコードあり");
                     $attendances = $attendanceTable->get($att['id']);
+                    LOG::debug($attendances);
                 } else {
+                    LOG::debug("レコードなし");
                     $attendances = $attendanceTable->newentity();
                 }
                 $attendances->user_id = $data["user_id"]; // user_idを設定
@@ -260,16 +265,75 @@ class AbsentsController extends AppController
         $this->set('staffs', $staffs);
 
         $absent = $this->Absents->get($id);
-        if ($this->Absents->delete($absent)) {
-            $result = $this->Absents
-            ->find()
-            ->where(['Absents.id' => $id])
-            ->first();
-            $this->Flash->success(__('欠席情報が削除されました'));
-        } else {
-            $this->Flash->error(__('欠席情報は削除されませんでした'));
+        
+        // 削除前に欠勤データの情報を保存
+        $user_id = $absent->user_id;
+        $kekkindate = $absent->kekkindate;
+        
+        // トランザクション開始
+        $connection = ConnectionManager::get('default');
+        $connection->begin();
+        
+        try {
+            // 欠勤データを削除
+            if ($this->Absents->delete($absent)) {
+                // 関連する出勤データを更新
+                $updateResult = $this->updateAttendanceAfterAbsentDelete($user_id, $kekkindate);
+                
+                if ($updateResult) {
+                    // 更新が成功した場合はコミット
+                    $connection->commit();
+                    $this->Flash->success(__('欠席情報が削除されました'));
+                } else {
+                    // 更新が失敗した場合はロールバック
+                    $connection->rollback();
+                    $this->Flash->error(__('関連する出勤データが見つからないか、更新に失敗しました'));
+                }
+            } else {
+                // 削除に失敗した場合はロールバック
+                $connection->rollback();
+                $this->Flash->error(__('欠席情報は削除されませんでした'));
+            }
+        } catch (\Exception $e) {
+            // エラーが発生した場合はロールバック
+            $connection->rollback();
+            $this->Flash->error(__('エラーが発生しました: ') . $e->getMessage());
         }
+        
         return $this->redirect(['action' => 'indexn']);
+    }
+    
+    /**
+     * 欠勤データ削除後に関連する出勤データを更新する
+     * 
+     * @param int $user_id ユーザーID
+     * @param string $kekkindate 欠勤日
+     * @return bool 更新が成功した場合はtrue、失敗した場合はfalse
+     */
+    private function updateAttendanceAfterAbsentDelete($user_id, $kekkindate)
+    {
+        $attendancesTable = TableRegistry::get('Attendances');
+        
+        // 該当する出勤データを検索
+        $attendance = $attendancesTable->find()
+            ->where([
+                'Attendances.user_id' => $user_id,
+                'Attendances.date' => $kekkindate
+            ])
+            ->first();
+        
+        if ($attendance) {
+            // kekkinを0に、bikouを初期化、user_staffidを0に設定
+            $attendance->kekkin = 0;
+            $attendance->bikou = null;
+            $attendance->user_staffid = 0;
+            
+            // データベースに保存して結果を返す
+            return $attendancesTable->save($attendance) !== false;
+        }
+        
+        // 出勤データが見つからない場合はエラー
+        return false;
     }
 
     public function detailn()
