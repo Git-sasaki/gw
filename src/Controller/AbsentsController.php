@@ -161,19 +161,15 @@ class AbsentsController extends AppController
             $data = $this->request->getData();
             $postdate = $data["kekkinyear"]."-".$data["kekkinmonth"]."-".$data["kekkindate"];
             $uketsuke = $data["year"]."-".$data["month"]."-".$data["date"];
-            LOG::debug("データチェック");
-            LOG::debug($data);
             $abs = $this->Absents
             ->find()
             ->where(["Absents.date" => $postdate, "Absents.user_id" => $data["user_id"]])
             ->first();
 
-            LOG::debug("attendace レコードチェック");
             $att = $attendanceTable
             ->find()
             ->where(["Attendances.date" => $postdate, "Attendances.user_id" => $data["user_id"]])
             ->first();
-            LOG::debug($att);
 
             if(!empty($abs)) {
                 $absents = $this->Absents->get($abs['id']);
@@ -199,11 +195,8 @@ class AbsentsController extends AppController
 
             if($this->Absents->save($absents)) {
                 if(!empty($att)) {
-                    LOG::debug("レコードあり");
                     $attendances = $attendanceTable->get($att['id']);
-                    LOG::debug($attendances);
                 } else {
-                    LOG::debug("レコードなし");
                     $attendances = $attendanceTable->newentity();
                 }
                 $attendances->user_id = $data["user_id"]; // user_idを設定

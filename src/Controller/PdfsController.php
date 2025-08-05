@@ -407,7 +407,7 @@ class PdfsController extends AppController
         $nobenin = 0;
         $usercount = 0;
 
-        foreach($zero_users as $zero_user) {    
+        foreach($zero_users as $zero_user) { 
             $results = $attendanceTable
             ->find()
             ->where(['Attendances.user_id' => $zero_user["id"], 
