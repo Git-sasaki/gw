@@ -722,13 +722,13 @@ class PrintsController extends AppController
     public function jisseki()
     {
         if($this->request-> getSession()->read('Auth.User.adminfrag') == 1){
+
             // 基本的な情報を取得
             $usersTable = TableRegistry::get('Users');
             $reportTable = TableRegistry::get('Reports');
             $attendanceTable = TableRegistry::get('Attendances');
             $jigyoushasTable = TableRegistry::get('Jigyoushas');
             $data = $this->request->getData();
-            LOG::debug($data["syuroutype"]);
             $timestamp = mktime(0,0,0,$data["month"],1,$data["year"]);
             $matsu = mktime(0,0,0,$data["month"]+1,date('t',$timestamp),$data["year"]);
             $weekday = ['日','月','火','水','木','金','土'];
@@ -738,49 +738,77 @@ class PrintsController extends AppController
             $spreadsheet->setActiveSheetIndex(0);
             $sheet = $spreadsheet->getActiveSheet();
 
+            // タイプ文字列作成
+            $typeLabel = '';
+            if (isset($data['syuroutype']) && $data['syuroutype'] !== '') {
+                if ($data['syuroutype'] == '0') {
+                    $typeLabel = 'A型';
+                } elseif ($data['syuroutype'] == '1') {
+                    $typeLabel = 'B型';
+                }
+            }
+
             // 日付と会社名を出力
             $getCompany = $jigyoushasTable->find()->where(['Jigyoushas.id'=>1])->first();
             $sheet->setCellValue('B4',$data["year"]." 年 ".$data["month"]." 月");
             $sheet->setCellValue('D5',$getCompany["jnumber"]);
-            $sheet->setCellValue('D6',$getCompany["jname"]);
+            $sheet->setCellValue('D6',$getCompany["jname"]." ".$typeLabel);
 
-            $users = [];
-            $getusers = $usersTable
-            ->find()
-            ->where(['Users.adminfrag' => 0])
-            ->EnableHydration(false)
-            ->toArray();
+            // attendanceTableから在籍人数を取得
+            $startDate = date('Y-m-01', $timestamp);
+            $endDate = date('Y-m-t', $timestamp);
+            
+            $attendanceQuery = $attendanceTable
+                ->find()
+                ->select(['Attendances.user_id'])
+                ->distinct(['Attendances.user_id'])
+                ->where([
+                    'Attendances.date >=' => $startDate,
+                    'Attendances.date <=' => $endDate
+                ]);
             
             // A型/B型に基づいてフィルタリング
-            if (isset($data['type']) && $data['type'] !== '') {
-                $filteredUsers = [];
-                foreach ($getusers as $getuser) {
-                    // wrkCaseフィールドでA型/B型を判定
-                    if (isset($getuser['wrkCase']) && $getuser['wrkCase'] == $data['type']) {
-                        $filteredUsers[] = $getuser;
-                    }
-                }
-                $getusers = $filteredUsers;
+            if (isset($data['syuroutype']) && $data['syuroutype'] !== '') {
+                $attendanceQuery->where(['Attendances.user_type' => $data['syuroutype']]);
             }
-            foreach($getusers as $getuser) {
-                if($data["year"] < $getuser["created"]->i18nFormat("yyyy")) {
-                    continue;
-                } elseif($data["year"] == $getuser["created"]->i18nFormat("yyyy") 
-                        && date('n',$timestamp) < $getuser["created"]->i18nFormat("M")) {
-                    continue;
-                } else {
-                    if(empty($getuser["retired"])) {
-                        array_push($users,$getuser);
-                    } elseif($data["year"] < $getuser["retired"]->i18nFormat("yyyy")) {
-                        array_push($users,$getuser);
-                    } elseif($data["year"] == $getuser["retired"]->i18nFormat("yyyy")) {
-                        if(date('n',$timestamp) <= $getuser["retired"]->i18nFormat("M")) {
+            
+            $attendanceUserIds = $attendanceQuery
+                ->EnableHydration(false)
+                ->toArray();
+            
+            // 在籍人数をカウント
+            $userCount = count($attendanceUserIds);
+            $sheet->setCellValue('I5', $userCount . "　名");
+            
+            // ユーザー情報を取得（attendanceTableから取得したIDを使用）
+            $users = [];
+            if (!empty($attendanceUserIds)) {
+                $userIds = array_column($attendanceUserIds, 'user_id');
+                $getusers = $usersTable
+                    ->find()
+                    ->where(['Users.id IN' => $userIds, 'Users.adminfrag' => 0])
+                    ->EnableHydration(false)
+                    ->toArray();
+                
+                foreach($getusers as $getuser) {
+                    if($data["year"] < $getuser["created"]->i18nFormat("yyyy")) {
+                        continue;
+                    } elseif($data["year"] == $getuser["created"]->i18nFormat("yyyy") 
+                            && date('n',$timestamp) < $getuser["created"]->i18nFormat("M")) {
+                        continue;
+                    } else {
+                        if(empty($getuser["retired"])) {
                             array_push($users,$getuser);
+                        } elseif($data["year"] < $getuser["retired"]->i18nFormat("yyyy")) {
+                            array_push($users,$getuser);
+                        } elseif($data["year"] == $getuser["retired"]->i18nFormat("yyyy")) {
+                            if(date('n',$timestamp) <= $getuser["retired"]->i18nFormat("M")) {
+                                array_push($users,$getuser);
+                            }
                         }
                     }
                 }
             }
-            $sheet->setCellValue('I5',count($users)."　名");
 
             // 初期化
             $allshukkin = 0; $allkoukyu = 0; $allkekkin = 0; $allpaid = 0; $allmedical = 0;$allsougei = 0;
@@ -801,6 +829,17 @@ class PrintsController extends AppController
                     ->find()
                     ->where(['Attendances.date'=>date('Y-m-d',$timestamp),'Attendances.user_id'=>$user["id"]])
                     ->first();
+                    
+                    // A型/B型に基づいてフィルタリング
+                    if (isset($data['syuroutype']) && $data['syuroutype'] !== '') {
+                        // user_typeフィールドでA型/B型を判定（user_typeはUsers.wrkCaseから派生）
+                        if (!empty($attendance) && isset($attendance['user_type'])) {
+                            // user_typeが選択されたタイプと一致しない場合はスキップ
+                            if ($attendance['user_type'] != $data['syuroutype']) {
+                                continue;
+                            }
+                        }
+                    }
                     if(!empty($attendance["koukyu"])) {
                         if($attendance["koukyu"] == 1) {
                             $koukyu++;
@@ -907,9 +946,7 @@ class PrintsController extends AppController
             $sheet->setCellValue('K42',$allritsu." %");            
 
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            // ファイル名にタイプを含める
-            $typeLabel = isset($data['type']) && $data['type'] !== '' ? $data['type'] . '型' : '';
-            $filename = date("Y-m",$timestamp) . "　月間実績票" . $typeLabel . ".xlsx";
+            $filename = date("Y-m",$timestamp) . " 月間実績票 " . $typeLabel . ".xlsx";
             header('Content-Disposition: attachment;filename=' . $filename);
             header('Cache-Control: max-age=0');
             header('Cache-Control: max-age=1');

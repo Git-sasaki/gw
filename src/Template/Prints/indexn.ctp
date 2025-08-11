@@ -341,19 +341,16 @@
                     <?= $this->Form->control('month',['type'=>'select','label'=>"月",'value'=>date("m")], $months) ?> 
                 </div>
             </div>
-            <h4 class = "exportchibi">タイプ選択</h4>
+            <h4 class = "exportchibi">就労タイプ</h4>
             <div class = "staffbox mlv25">
-                <?= $this->Form->select('type',[
-                    'A' => 'A型',
-                    'B' => 'B型'
+                <?= $this->Form->select('syuroutype',[
+                    '0' => 'A型',
+                    '1' => 'B型'
                 ], [
                     'label' => false,
-                    'empty' => 'タイプを選択してください',
-                    'default' => 'A'
+                    'default' => '0'
                 ]); ?>
             </div>
-            <br>
-            <br>
             <div class="mt10_button mt20 mlv25">
                 <?= $this->Form->button(__("表示")) ?>
             </div>
