@@ -407,7 +407,7 @@ class PdfsController extends AppController
         $nobenin = 0;
         $usercount = 0;
 
-        foreach($zero_users as $zero_user) { 
+        foreach($zero_users as $zero_user) {
             $results = $attendanceTable
             ->find()
             ->where(['Attendances.user_id' => $zero_user["id"], 
@@ -416,6 +416,11 @@ class PdfsController extends AppController
             ->order(['Attendances.date'=>'ASC'])
             ->EnableHydration(false)
             ->toArray();
+
+            // $resultsが空の場合はcontinue
+            if (empty($results)) {
+                continue;
+            }
 
             //有休時間算出の為に1日の基本労働時間を算出
             $worktime = strtotime(date($zero_user["douttime"]->i18nFormat("yyyy/MM/dd H:m"))) - strtotime(date($zero_user["dintime"]->i18nFormat("yyyy/MM/dd H:m")));

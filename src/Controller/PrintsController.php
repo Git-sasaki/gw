@@ -728,6 +728,7 @@ class PrintsController extends AppController
             $attendanceTable = TableRegistry::get('Attendances');
             $jigyoushasTable = TableRegistry::get('Jigyoushas');
             $data = $this->request->getData();
+            LOG::debug($data["syuroutype"]);
             $timestamp = mktime(0,0,0,$data["month"],1,$data["year"]);
             $matsu = mktime(0,0,0,$data["month"]+1,date('t',$timestamp),$data["year"]);
             $weekday = ['日','月','火','水','木','金','土'];
@@ -749,6 +750,18 @@ class PrintsController extends AppController
             ->where(['Users.adminfrag' => 0])
             ->EnableHydration(false)
             ->toArray();
+            
+            // A型/B型に基づいてフィルタリング
+            if (isset($data['type']) && $data['type'] !== '') {
+                $filteredUsers = [];
+                foreach ($getusers as $getuser) {
+                    // wrkCaseフィールドでA型/B型を判定
+                    if (isset($getuser['wrkCase']) && $getuser['wrkCase'] == $data['type']) {
+                        $filteredUsers[] = $getuser;
+                    }
+                }
+                $getusers = $filteredUsers;
+            }
             foreach($getusers as $getuser) {
                 if($data["year"] < $getuser["created"]->i18nFormat("yyyy")) {
                     continue;
@@ -894,7 +907,10 @@ class PrintsController extends AppController
             $sheet->setCellValue('K42',$allritsu." %");            
 
             header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            header('Content-Disposition: attachment;filename='.date("Y-m",$timestamp)."　月間実績票.xlsx");
+            // ファイル名にタイプを含める
+            $typeLabel = isset($data['type']) && $data['type'] !== '' ? $data['type'] . '型' : '';
+            $filename = date("Y-m",$timestamp) . "　月間実績票" . $typeLabel . ".xlsx";
+            header('Content-Disposition: attachment;filename=' . $filename);
             header('Cache-Control: max-age=0');
             header('Cache-Control: max-age=1');
             header('Expires: Mon, 26 Jul 1997 05:00:00 GMT');
