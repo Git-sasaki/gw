@@ -31,6 +31,10 @@ class PrintsController extends AppController
         $updf = $this->request->getSession()->read('updf');
         $this->set(compact('updf'));
         $this->request->getSession()->delete('updf');
+        
+        // 就労タイプのセッション値を設定
+        $work_type = $this->request->getSession()->read('work_type') ?: 'A';
+        $this->set(compact('work_type'));
         $umpdf = $this->request->getSession()->read('umpdf');
         $this->set(compact('umpdf'));
         $this->request->getSession()->delete('umpdf');

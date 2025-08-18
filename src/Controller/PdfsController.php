@@ -66,6 +66,7 @@ class PdfsController extends AppController
                     'uyear' => $data["year"],
                     'umonth' => $data["month"],
                     'uuser_id' => $data["id"],
+                    'work_type' => isset($data["work_type"]) ? $data["work_type"] : 'A', // 就労タイプ（A型またはB型）
                 ]);
                 $this->request->getSession()->write('updf',true);
             } elseif($data["hidden"]==1) {
@@ -356,14 +357,27 @@ class PdfsController extends AppController
         $torf = array("","〇");
         $weekday = array('日','月','火','水','木','金','土');
         
-        // テンプレートの読み込み
-        $pdf->setSourceFile(WWW_ROOT."pdf/template.pdf"); 
-        
-        // データを取得
+        // セッションからデータを取得
         $year = $this->request->getSession()->read('uyear');
         $month = $this->request->getSession()->read('umonth');
         $staff = $this->request->getSession()->read('uuser_id');
+        $work_type = $this->request->getSession()->read('work_type') ?: 'A'; // 就労タイプ（デフォルトはA型）
     
+        // 就労タイプに応じたテンプレートファイルを選択
+        if ($work_type == 'B') {
+            $template_file = WWW_ROOT."pdf/template_b.pdf"; // B型用テンプレート
+            // B型用テンプレートが存在しない場合はA型用を使用
+            if (!file_exists($template_file)) {
+                $template_file = WWW_ROOT."pdf/template.pdf";
+                $work_type = 'A'; // フォールバック
+            }
+        } else {
+            $template_file = WWW_ROOT."pdf/template.pdf"; // A型用テンプレート（デフォルト）
+        }
+        
+        // テンプレートの読み込み
+        $pdf->setSourceFile($template_file); 
+        
         // カレンダーの設定
         $timestamp = mktime(0,0,0,$month,1,$year);
         $timestamp2 = mktime(0,0,0,$month,date('t',$timestamp),$year);
@@ -478,6 +492,12 @@ class PdfsController extends AppController
                 $pdf -> Text(76,29,$zero_user['id']);    
                 $pdf -> Text(33.5,32.5,$zero_user["sjnumber"]);         
                 $pdf -> Text(162,29,$getCompany["jnumber"]);
+
+                // 就労タイプの表示（B型の場合のみ）
+                if ($work_type == 'B') {
+                    $pdf -> SetFont('kozminproregular','',10);
+                    $pdf -> Text(17.1,20,"就労タイプ：B型");
+                }
 
                 if(mb_strlen($zero_user["name"]."　さん") <= 8) {
                     $pdf -> SetFont('kozminproregular','',12);

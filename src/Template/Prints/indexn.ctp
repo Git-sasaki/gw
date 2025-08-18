@@ -80,6 +80,20 @@
                     <?= $this->Form->select('id',$users,['id'=>'staff_id','label' => false,'empty'=>array('0'=>'ALL'),'value'=>$this->request->getSession()->read('uuser_id')]);?>
                 <?php endif; ?>
             </div>
+            <h4 class = "exportchibi">就労タイプ</h4>
+            <div class = "staffbox mlv25">
+                <?php 
+                $work_type = $this->request->getSession()->read('work_type') ?: 'A';
+                ?>
+                <?= $this->Form->select('work_type',[
+                    'A' => 'A型',
+                    'B' => 'B型'
+                ], [
+                    'id' => 'work_type',
+                    'label' => false,
+                    'value' => $work_type
+                ]); ?>
+            </div>
             <div class="mt10_button mt20 mlv25">
                 <?= $this->Form->button(__("表示")) ?>
             </div>
