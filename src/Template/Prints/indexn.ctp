@@ -58,42 +58,50 @@
             <h4 class = "exportchibi">年月日選択</h4>
                 <div class = "odakoku mlv25">
                 <div class = "sdakoku">
-                    <?php if(empty($this->request->getSession()->read('uyear'))): ?>
-                        <?= $this->Form->control('year',['type'=>'select','label'=>"年",'value'=>date("Y")], $years) ?>
-                    <?php else: ?>
-                        <?= $this->Form->control('year',['type'=>'select','label'=>"年",'value'=>$this->request->getSession()->read('uyear')], $years) ?>                   
-                    <?php endif; ?>
+                    <?php 
+                    $uyear = $this->request->getSession()->read('uyear');
+                    $uyear_value = ($uyear !== null && $uyear !== '') ? $uyear : date("Y");
+                    // デバッグ用：セッション値を表示
+                    echo "<!-- Debug: uyear=" . var_export($uyear, true) . ", uyear_value=" . var_export($uyear_value, true) . " -->";
+                    ?>
+                    <?= $this->Form->control('year',['type'=>'select','label'=>"年",'value'=>$uyear_value], $years) ?>
                 </div>
                 <div class = "sdakoku">
-                    <?php if(empty($this->request->getSession()->read('umonth'))): ?>
-                        <?= $this->Form->control('month',['type'=>'select','label'=>"月",'value'=>date("m")], $months) ?>
-                    <?php else: ?>
-                        <?= $this->Form->control('month',['type'=>'select','label'=>"月",'value'=>$this->request->getSession()->read('umonth')], $months) ?>                   
-                    <?php endif; ?>
+                    <?php 
+                    $umonth = $this->request->getSession()->read('umonth');
+                    $umonth_value = ($umonth !== null && $umonth !== '') ? $umonth : date("m");
+                    // デバッグ用：セッション値を表示
+                    echo "<!-- Debug: umonth=" . var_export($umonth, true) . ", umonth_value=" . var_export($umonth_value, true) . " -->";
+                    ?>
+                    <?= $this->Form->control('month',['type'=>'select','label'=>"月",'value'=>$umonth_value], $months) ?>
                 </div>
             </div>
-            <h4 class = "exportchibi">ユーザー</h4>  
-            <div class = "staffbox mlv25">
-                <?php if(empty($this->request->getSession()->read('uuser_id'))): ?>
-                    <?= $this->Form->select('id',$users,['id'=>'staff_id','label' => false,'empty'=>array('0'=>'ALL')]);?>
-                <?php else: ?>
-                    <?= $this->Form->select('id',$users,['id'=>'staff_id','label' => false,'empty'=>array('0'=>'ALL'),'value'=>$this->request->getSession()->read('uuser_id')]);?>
-                <?php endif; ?>
-            </div>
-            <h4 class = "exportchibi">就労タイプ</h4>
-            <div class = "staffbox mlv25">
-                <?php 
-                $work_type = $this->request->getSession()->read('work_type') ?: 'A';
-                ?>
-                <?= $this->Form->select('work_type',[
-                    'A' => 'A型',
-                    'B' => 'B型'
-                ], [
-                    'id' => 'work_type',
-                    'label' => false,
-                    'value' => $work_type
-                ]); ?>
-            </div>
+             <div class = "odakoku mlv25">
+                 <div class = "sdakoku" style="width: 135px;">
+                     <h4 class = "exportchibi" style="margin-left: 0; padding-left: 0;">ユーザー</h4>
+                     <?php if(empty($this->request->getSession()->read('uuser_id'))): ?>
+                         <?= $this->Form->select('id',$users,['id'=>'staff_id','label' => false,'empty'=>array('0'=>'ALL')]);?>
+                     <?php else: ?>
+                         <?= $this->Form->select('id',$users,['id'=>'staff_id','label' => false,'empty'=>array('0'=>'ALL'),'value'=>$this->request->getSession()->read('uuser_id')]);?>
+                     <?php endif; ?>
+                 </div>
+                 <div class = "sdakoku" style="width: 120px; padding-left: 20px;">
+                     <h4 class = "exportchibi" style="margin-left: 0px; padding-left: 0;">就労タイプ</h4>
+                     <?php 
+                     $work_type = $this->request->getSession()->read('work_type') ?: '0';
+                     ?>
+                     <?= $this->Form->select('work_type',[
+                         '0' => 'A型',
+                         '1' => 'B型'
+                     ], [
+                         'id' => 'work_type',
+                         'label' => false,
+                         'value' => $work_type,
+                         'default' => '0'
+                     ]); ?>
+                 </div>
+             </div>
+            
             <div class="mt10_button mt20 mlv25">
                 <?= $this->Form->button(__("表示")) ?>
             </div>
@@ -616,4 +624,4 @@
     </div>
 </div>
 <br>
-        
+        リストボックスのリストボックスの

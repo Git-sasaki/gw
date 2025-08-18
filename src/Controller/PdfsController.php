@@ -22,15 +22,64 @@ class PdfsController extends AppController
                 if($data["hidden"]==0 || $data["hidden"]==2) {
                 $timestamp = mktime(0,0,0,$data["month"],1,$data["year"]);
                 if($data["id"] != 0) {
+                    // 就労タイプに基づいてデータをフィルタリング
+                    $work_type = isset($data["work_type"]) ? $data["work_type"] : '0';
+                    
+                    // work_typeとattendanceTableのuser_typeフィールドが一致するデータを取得
                     $results = $attendanceTable
                     ->find()
                     ->where(['Attendances.user_id' => $data["id"], 
                              'Attendances.date >=' => date('Y-m',$timestamp).'-01', 
-                             'Attendances.date <=' => date('Y-m',$timestamp)."-".date("t",$timestamp)])
+                             'Attendances.date <=' => date('Y-m',$timestamp)."-".date("t",$timestamp),
+                             'Attendances.user_type' => $work_type])
                     ->order(['Attendances.date'=>'ASC'])
                     ->EnableHydration(false)
                     ->toArray();
+                    
                     if(empty($results)) {
+                        // データが存在しない場合でも、設定値をセッションに保存
+                        $this->request->getSession()->write([
+                            'type' => $data["hidden"],
+                            'uyear' => $data["year"],
+                            'umonth' => $data["month"],
+                            'uuser_id' => $data["id"],
+                            'work_type' => isset($data["work_type"]) ? $data["work_type"] : '0',
+                        ]);
+                        $this->Flash->error(__('該当のデータが存在しません'));
+                        return $this->redirect(["controller" => "prints", "action" => "indexn"]);
+                    }
+                } elseif($data["id"] == 0) {
+                    // ALLが選択された場合、就労タイプに基づいてデータの存在確認
+                    $work_type = isset($data["work_type"]) ? $data["work_type"] : '0';
+                    
+                    $flag = 0;
+                    $users = $usersTable->find('list',['valueField'=>'id'])->toArray();
+                    foreach($users as $user) {
+                        $results = $attendanceTable
+                        ->find()
+                        ->select(['Attendances.koukyu','Attendances.paid','Attendances.kekkin'])
+                        ->where(['Attendances.user_id' => $user, 
+                                 'Attendances.date >=' => date('Y-m',$timestamp).'-01', 
+                                 'Attendances.date <=' => date('Y-m',$timestamp)."-".date("t",$timestamp),
+                                 'Attendances.user_type' => $work_type])
+                        ->order(['Attendances.date'=>'ASC'])
+                        ->EnableHydration(false)
+                        ->first();
+                        pr($results);
+                        if(!empty($results)) {
+                            $flag = 1;
+                            break;
+                        }
+                    }
+                    if($flag == 0) {
+                        // データが存在しない場合でも、設定値をセッションに保存
+                        $this->request->getSession()->write([
+                            'type' => $data["hidden"],
+                            'uyear' => $data["year"],
+                            'umonth' => $data["month"],
+                            'uuser_id' => $data["id"],
+                            'work_type' => isset($data["work_type"]) ? $data["work_type"] : '0',
+                        ]);
                         $this->Flash->error(__('該当のデータが存在しません'));
                         return $this->redirect(["controller" => "prints", "action" => "indexn"]);
                     }
@@ -66,7 +115,7 @@ class PdfsController extends AppController
                     'uyear' => $data["year"],
                     'umonth' => $data["month"],
                     'uuser_id' => $data["id"],
-                    'work_type' => isset($data["work_type"]) ? $data["work_type"] : 'A', // 就労タイプ（A型またはB型）
+                    'work_type' => isset($data["work_type"]) ? $data["work_type"] : '0', // 就労タイプ（A型=0またはB型=1）
                 ]);
                 $this->request->getSession()->write('updf',true);
             } elseif($data["hidden"]==1) {
@@ -361,21 +410,10 @@ class PdfsController extends AppController
         $year = $this->request->getSession()->read('uyear');
         $month = $this->request->getSession()->read('umonth');
         $staff = $this->request->getSession()->read('uuser_id');
-        $work_type = $this->request->getSession()->read('work_type') ?: 'A'; // 就労タイプ（デフォルトはA型）
+        $work_type = $this->request->getSession()->read('work_type') ?: '0'; // 就労タイプ（デフォルトはA型=0）
     
-        // 就労タイプに応じたテンプレートファイルを選択
-        if ($work_type == 'B') {
-            $template_file = WWW_ROOT."pdf/template_b.pdf"; // B型用テンプレート
-            // B型用テンプレートが存在しない場合はA型用を使用
-            if (!file_exists($template_file)) {
-                $template_file = WWW_ROOT."pdf/template.pdf";
-                $work_type = 'A'; // フォールバック
-            }
-        } else {
-            $template_file = WWW_ROOT."pdf/template.pdf"; // A型用テンプレート（デフォルト）
-        }
-        
-        // テンプレートの読み込み
+        // テンプレートファイルの読み込み（A型・B型共通）
+        $template_file = WWW_ROOT."pdf/template.pdf";
         $pdf->setSourceFile($template_file); 
         
         // カレンダーの設定
@@ -422,11 +460,13 @@ class PdfsController extends AppController
         $usercount = 0;
 
         foreach($zero_users as $zero_user) {
+            // 就労タイプに基づいてデータをフィルタリング（A型=0, B型=1）
             $results = $attendanceTable
             ->find()
             ->where(['Attendances.user_id' => $zero_user["id"], 
                      'Attendances.date >=' => date('Y-m',$timestamp).'-01', 
-                     'Attendances.date <=' => date('Y-m',$timestamp)."-".date("t",$timestamp)])
+                     'Attendances.date <=' => date('Y-m',$timestamp)."-".date("t",$timestamp),
+                     'Attendances.user_type' => $work_type])
             ->order(['Attendances.date'=>'ASC'])
             ->EnableHydration(false)
             ->toArray();
@@ -487,7 +527,9 @@ class PdfsController extends AppController
                 // 名前とidの出力
                 $pdf -> SetFont('kozminproregular','',10);
                 $pdf -> Text(17.1,24.7,$year." 年 ".$month." 月");         
-                $pdf -> Text(148,34,$getCompany["jname"]);
+                // 事業所名の後に空白を1文字入れてA型もしくはB型を表示
+                $work_type_label = ($work_type == '1') ? 'B型' : 'A型';
+                $pdf -> Text(148,34,$getCompany["jname"]." ".$work_type_label);
                 $pdf -> SetFont('kozminproregular','',8);
                 $pdf -> Text(76,29,$zero_user['id']);    
                 $pdf -> Text(33.5,32.5,$zero_user["sjnumber"]);         
