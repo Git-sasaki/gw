@@ -19,7 +19,8 @@ class PdfsController extends AppController
 
             // ユーザーの取得
             $data = $this->request->getData();
-                if($data["hidden"]==0 || $data["hidden"]==2) {
+                if($data["hidden"]==0) {
+                // 利用者PDF印刷の場合
                 $timestamp = mktime(0,0,0,$data["month"],1,$data["year"]);
                 if($data["id"] != 0) {
                     // 就労タイプに基づいてデータをフィルタリング
@@ -83,7 +84,34 @@ class PdfsController extends AppController
                         $this->Flash->error(__('該当のデータが存在しません'));
                         return $this->redirect(["controller" => "prints", "action" => "indexn"]);
                     }
-                } elseif($data["hidden"]==1) {
+                }
+            } elseif($data["hidden"]==2) {
+                // 職員PDF印刷の場合（就労タイプの条件は含めない）
+                $timestamp = mktime(0,0,0,$data["month"],1,$data["year"]);
+                if($data["id"] != 0) {
+                    // 就労タイプの条件なしでデータを取得
+                    $results = $attendanceTable
+                    ->find()
+                    ->where(['Attendances.user_id' => $data["id"], 
+                             'Attendances.date >=' => date('Y-m',$timestamp).'-01', 
+                             'Attendances.date <=' => date('Y-m',$timestamp)."-".date("t",$timestamp)])
+                    ->order(['Attendances.date'=>'ASC'])
+                    ->EnableHydration(false)
+                    ->toArray();
+                    
+                    if(empty($results)) {
+                        // データが存在しない場合でも、設定値をセッションに保存
+                        $this->request->getSession()->write([
+                            'type' => $data["hidden"],
+                            'syear' => $data["year"],
+                            'smonth' => $data["month"],
+                            'suser_id' => $data["id"],
+                        ]);
+                        $this->Flash->error(__('該当のデータが存在しません'));
+                        return $this->redirect(["controller" => "prints", "action" => "indexn"]);
+                    }
+                } elseif($data["id"] == 0) {
+                    // ALLが選択された場合、就労タイプの条件なしでデータの存在確認
                     $flag = 0;
                     $users = $usersTable->find('list',['valueField'=>'id'])->toArray();
                     foreach($users as $user) {
@@ -103,9 +131,40 @@ class PdfsController extends AppController
                         }
                     }
                     if($flag == 0) {
+                        // データが存在しない場合でも、設定値をセッションに保存
+                        $this->request->getSession()->write([
+                            'type' => $data["hidden"],
+                            'syear' => $data["year"],
+                            'smonth' => $data["month"],
+                            'suser_id' => $data["id"],
+                        ]);
                         $this->Flash->error(__('該当のデータが存在しません'));
                         return $this->redirect(["controller" => "prints", "action" => "indexn"]);
                     }
+                }
+            } elseif($data["hidden"]==1) {
+                $timestamp = mktime(0,0,0,$data["month"],1,$data["year"]);
+                $flag = 0;
+                $users = $usersTable->find('list',['valueField'=>'id'])->toArray();
+                foreach($users as $user) {
+                    $results = $attendanceTable
+                    ->find()
+                    ->select(['Attendances.koukyu','Attendances.paid','Attendances.kekkin'])
+                    ->where(['Attendances.user_id' => $user, 
+                             'Attendances.date >=' => date('Y-m',$timestamp).'-01', 
+                             'Attendances.date <=' => date('Y-m',$timestamp)."-".date("t",$timestamp)])
+                    ->order(['Attendances.date'=>'ASC'])
+                    ->EnableHydration(false)
+                    ->first();
+                    pr($results);
+                    if(!empty($results)) {
+                        $flag = 1;
+                        break;
+                    }
+                }
+                if($flag == 0) {
+                    $this->Flash->error(__('該当のデータが存在しません'));
+                    return $this->redirect(["controller" => "prints", "action" => "indexn"]);
                 }
             }
             // セッションでopenwindowのフラグを立ててindexに戻す
