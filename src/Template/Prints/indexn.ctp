@@ -64,7 +64,7 @@
                     // デバッグ用：セッション値を表示
                     echo "<!-- Debug: uyear=" . var_export($uyear, true) . ", uyear_value=" . var_export($uyear_value, true) . " -->";
                     ?>
-                    <?= $this->Form->control('year',['type'=>'select','label'=>"年",'value'=>$uyear_value], $years) ?>
+                    <?= $this->Form->control('year',['type'=>'select','label'=>"年",'value'=>$uyear_value,'onchange'=>'updateUsersList()'], $years) ?>
                 </div>
                 <div class = "sdakoku">
                     <?php 
@@ -73,16 +73,16 @@
                     // デバッグ用：セッション値を表示
                     echo "<!-- Debug: umonth=" . var_export($umonth, true) . ", umonth_value=" . var_export($umonth_value, true) . " -->";
                     ?>
-                    <?= $this->Form->control('month',['type'=>'select','label'=>"月",'value'=>$umonth_value], $months) ?>
+                    <?= $this->Form->control('month',['type'=>'select','label'=>"月",'value'=>$umonth_value,'onchange'=>'updateUsersList()'], $months) ?>
                 </div>
             </div>
              <div class = "odakoku mlv25">
                  <div class = "sdakoku" style="width: 135px;">
                      <h4 class = "exportchibi" style="margin-left: 0; padding-left: 0;">ユーザー</h4>
                      <?php if(empty($this->request->getSession()->read('uuser_id'))): ?>
-                         <?= $this->Form->select('id',$users,['id'=>'staff_id','label' => false,'empty'=>array('0'=>'ALL')]);?>
+                         <?= $this->Form->select('id',$users,['id'=>'user_id','label' => false,'empty'=>array('0'=>'ALL')]);?>
                      <?php else: ?>
-                         <?= $this->Form->select('id',$users,['id'=>'staff_id','label' => false,'empty'=>array('0'=>'ALL'),'value'=>$this->request->getSession()->read('uuser_id')]);?>
+                         <?= $this->Form->select('id',$users,['id'=>'user_id','label' => false,'empty'=>array('0'=>'ALL'),'value'=>$this->request->getSession()->read('uuser_id')]);?>
                      <?php endif; ?>
                  </div>
                  <div class = "sdakoku" style="width: 120px; padding-left: 20px;">
@@ -97,7 +97,8 @@
                          'id' => 'work_type',
                          'label' => false,
                          'value' => $work_type,
-                         'default' => '0'
+                         'default' => '0',
+                         'onchange' => 'updateUsersList()'
                      ]); ?>
                  </div>
              </div>
@@ -621,7 +622,113 @@
             </div>
             <?= $this -> Form -> end(); ?>
         </div>
-    </div>
+        </div>  
 </div>
 <br>
-        リストボックスのリストボックスの
+
+<script>
+/**
+ * 指定年月と就労タイプに基づいて利用者リストを更新
+ */
+function updateUsersList() {
+    // 出勤簿(利用者)PDF印刷のフォーム内の要素を検索
+    const form = document.querySelector('form[action*="pdfs/getquery0"]');
+    if (!form) {
+        console.error('出勤簿(利用者)PDF印刷のフォームが見つかりません');
+        return;
+    }
+    
+    const yearSelect = form.querySelector('select[name="year"]');
+    const monthSelect = form.querySelector('select[name="month"]');
+    const workTypeSelect = form.querySelector('select[name="work_type"]');
+    const userSelect = form.querySelector('select[name="id"]');
+    const submitButton = form.querySelector('button[type="submit"]');
+    
+    if (!yearSelect || !monthSelect || !workTypeSelect || !userSelect || !submitButton) {
+        console.error('必要な要素が見つかりません');
+        return;
+    }
+    
+    const year = yearSelect.value;
+    const month = monthSelect.value;
+    const workType = workTypeSelect.value;
+    
+    // 現在選択されている利用者IDを保存
+    const currentUserId = userSelect.value;
+    
+    // CSRFトークンを取得（Calendars/indexn.ctpと同じ方法）
+    const csrfToken = document.querySelector('input[name="_csrfToken"]')?.value || '';
+    
+    // AJAXリクエストを送信
+    fetch('<?= $this->Url->build(["controller" => "Prints", "action" => "getUsersByDateAndWorkType"], true) ?>', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-Token': csrfToken
+        },
+        body: new URLSearchParams({
+            year: year,
+            month: month,
+            work_type: workType
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            console.error('エラーが発生しました:', data.error);
+            return;
+        }
+        
+        // 利用者リストを更新
+        userSelect.innerHTML = '';
+        
+        if (Object.keys(data).length === 0) {
+            // 利用者がいない場合
+            userSelect.disabled = true;
+            submitButton.disabled = true;
+            // 利用者がいない場合のメッセージを表示
+            const noUserOption = document.createElement('option');
+            noUserOption.value = '';
+            noUserOption.textContent = '利用者がいません';
+            noUserOption.disabled = true;
+            userSelect.appendChild(noUserOption);
+        } else {
+            // 利用者がいる場合
+            userSelect.disabled = false;
+            submitButton.disabled = false;
+            
+            Object.keys(data).forEach(userId => {
+                const option = document.createElement('option');
+                option.value = userId;
+                option.textContent = data[userId];
+                userSelect.appendChild(option);
+            });
+            
+            // 以前選択されていた利用者が新しいリストに存在する場合は選択状態を復元
+            if (currentUserId && data.hasOwnProperty(currentUserId)) {
+                userSelect.value = currentUserId;
+            } else {
+                // 存在しない場合はALLを選択
+                userSelect.value = '0';
+            }
+        }
+    })
+    .catch(error => {
+        console.error('AJAXリクエストでエラーが発生しました:', error);
+    });
+}
+
+// ページ読み込み時に初期化
+document.addEventListener('DOMContentLoaded', function() {
+    // 少し遅延させてから初期化（フォーム要素が完全に読み込まれるのを待つ）
+    setTimeout(function() {
+        updateUsersList();
+    }, 100);
+});
+</script>

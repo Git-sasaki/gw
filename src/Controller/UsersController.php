@@ -549,6 +549,7 @@ class UsersController extends AppController
                 }
             }
 
+            $getRep = '';
             $workPlaces = $workplacesTable->find()->EnableHydration(false)->toArray();
             for($i = 0; $i < count($workPlaces); $i++) {
                 //削除された場所は飛ばす

@@ -22,6 +22,29 @@ use Cake\Log\Log;
 
 class PrintsController extends AppController
 {
+    public function beforeFilter(\Cake\Event\EventInterface $event)
+    {
+        parent::beforeFilter($event);
+        
+        // getUsersByDateAndWorkTypeアクションでCSRFチェックを無効化
+        if ($this->request->getParam('action') === 'getUsersByDateAndWorkType') {
+            $this->getEventManager()->off('Controller.beforeFilter');
+        }
+    }
+    
+    /**
+     * 認証チェック
+     */
+    public function isAuthorized($user)
+    {
+        // ログインしているユーザーはすべてのアクションにアクセス可能
+        if (isset($user)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
     public function indexn() 
     {
         $holidays = Yasumi::create('Japan', '2023', 'ja_JP');
@@ -111,6 +134,74 @@ class PrintsController extends AppController
         $kikan = ['直近12ヶ月'];
         $this->set(compact("staffs","users","years","hyears","oyears","months","hmonths","omonths",
                            "sort","remotes","sanchom","defsan","kikan", "workName"));
+    }
+
+    /**
+     * AJAX: 指定年月と就労タイプに基づいて利用者リストを取得
+     */
+    public function getUsersByDateAndWorkType()
+    {
+        $this->autoRender = false;
+        $this->response = $this->response->withType('json');
+
+        if ($this->request->is('ajax') || $this->request->is('post')) {
+            $year = $this->request->getData('year');
+            $month = $this->request->getData('month');
+            $workType = $this->request->getData('work_type');
+            
+            // workTypeを数値として扱う
+            $workType = (int)$workType;
+            
+                        // attendancesテーブルから指定年月と就労タイプに基づいて利用者を取得
+            $attendancesTable = TableRegistry::get('Attendances');
+            $usersTable = TableRegistry::get('Users');
+
+            // 指定年月の範囲を設定
+            $startDate = $year . '-' . sprintf('%02d', $month) . '-01';
+            $endDate = $year . '-' . sprintf('%02d', $month) . '-31';
+
+            // attendancesテーブルで指定年月と就労タイプに一致するデータがある利用者IDを取得
+            $whereConditions = [
+                'Attendances.date >=' => $startDate,
+                'Attendances.date <=' => $endDate
+            ];
+
+            // 就労タイプに基づいてuser_typeフィールドでフィルタリング
+            // A型=0, B型=1の両方でフィルタリングを適用
+            $whereConditions['Attendances.user_type'] = $workType;
+
+            $userIds = $attendancesTable
+                ->find()
+                ->select(['user_id'])
+                ->where($whereConditions)
+                ->group(['user_id'])
+                ->extract('user_id')
+                ->toArray();
+
+            if (!empty($userIds)) {
+                // 利用者情報を取得（adminfrag=0, display=0の条件を維持）
+                $users = $usersTable
+                    ->find('list', ['valueField' => 'name'])
+                    ->where([
+                        'Users.id IN' => $userIds,
+                        'Users.adminfrag' => 0
+                    ])
+                    ->order(['Users.narabi' => 'ASC', 'Users.id' => 'ASC'])
+                    ->toArray();
+                
+                // 利用者がいる場合のみALLオプションを追加
+                $result = ['0' => 'ALL'] + $users;
+            } else {
+                // 利用者がいない場合は空の配列を返す
+                $result = [];
+            }
+
+            $this->response = $this->response->withStringBody(json_encode($result));
+            return $this->response;
+        }
+
+        $this->response = $this->response->withStringBody(json_encode(['error' => 'Invalid request']));
+        return $this->response;
     }
 
     public function service()
