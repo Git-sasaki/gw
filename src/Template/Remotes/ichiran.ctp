@@ -134,7 +134,7 @@
                             <?= $this->Form->control('year',['type'=>'hidden','value'=>$jexdate[0]]) ?>
                             <?= $this->Form->control('month',['type'=>'hidden','value'=>$jexdate[1]]) ?>
                             <?= $this->Form->control('date',['type'=>'hidden','value'=>$jexdate[2]]) ?>
-                            <?= $this->Form->control('user_id',['type'=>'hidden','value'=>$getremote["user_id"]]) ?>
+                            <?= $this->Form->control('user_id',['type'=>'hidden','value'=>$getweekly["user_id"]]) ?>
                             <?= $this->Form->button("[編集]",["class"=>"ichibtn datalink"]) ?>
                             <?= $this->Form->end(); ?>
                         <?php endif; ?>

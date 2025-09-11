@@ -1,3 +1,11 @@
+<?php
+// $getthis["shudan"]の値を分割処理
+if (isset($getthis["shudan"]) && strlen($getthis["shudan"]) >= 3) {
+    $shudan_value = $getthis["shudan"];
+    $getthis["shudan"] = substr($shudan_value, 0, 1);  // 1文字目
+    $getthis["shudan2"] = substr($shudan_value, 2);    // 3文字目以降
+}
+?>
 <div class = "main3">
     <h4 class = "midashih4 mt30">　週間記録登録</h4>
     <?= $this->Form->create(__("View"),["type"=>"post","url"=>["action"=>"register2"]]); ?>
@@ -14,21 +22,19 @@
         <div class = "mlv25">手段：　</div>
             <div style = "width: 75px;">
                 <!-- 手段の欄の登録 -->
-                <?php if(empty($getthis["shudan"]) || $gyakushudan[$getthis["shudan"]]==1): ?>
+                <?php if(!isset($getthis["shudan"]) || $getthis["shudan"] === null): ?>
                     <?= $this->Form->select('shudan',$shudan,['type'=>'select','value'=>1]);?>
-                <?php elseif($gyakushudan[$getthis["shudan"]] == 0): ?>
-                    <?= $this->Form->select('shudan',$shudan,['type'=>'select','value'=>0]);?>
                 <?php else: ?>
-                    <?= $this->Form->select('shudan',$shudan,['type'=>'select','value'=>2]);?>
+                    <?= $this->Form->select('shudan',$shudan,['type'=>'select','value'=>$getthis["shudan"]]);?>
                 <?php endif; ?>
             </div>
             
             <!-- 手段の欄がその他になっている場合は横のテキストボックスに初期値として記入 -->
             <div style = "width:150px; margin-left:10px;">
                 <?php if(!empty($getthis["shudan"]) && $getthis["shudan"]==2): ?>
-                    <input type="text" name="shudan2" value = "<?= $getthis["shudan"] ?>">
+                    <input type="text" name="shudan2" value = "<?= isset($getthis["shudan2"]) ? $getthis["shudan2"] : '' ?>">
                 <?php else: ?>
-                    <input type="text" name="shudan2">
+                    <input type="text" name="shudan2" value = "<?= isset($getthis["shudan2"]) ? $getthis["shudan2"] : '' ?>">
                 <?php endif; ?>
             </div>
     </div>
@@ -85,7 +91,7 @@
                 <?= $this->Form->control('content', ['type'=>'textarea','label'=>false]); ?>
             <?php endif; ?>
             <div class="mt30">
-                <?= $this->Form->button(__("登録")) ?>
+                <?= $this->Form->button(__("登録"), ['onclick' => 'return validateForm();']) ?>
             </div>
             <?= $this->Form->end(); ?>
         </div>
@@ -102,3 +108,28 @@
         </div>
     </div>
     <br>
+
+<script>
+function validateForm() {
+    // 手段の値を取得
+    var shudanSelect = document.querySelector('select[name="shudan"]');
+    var shudan2Input = document.querySelector('input[name="shudan2"]');
+    
+    if (shudanSelect && shudan2Input) {
+        var shudanValue = shudanSelect.value;
+        var shudan2Value = shudan2Input.value.trim();
+        
+        // 手段が「その他」（値が2）の場合
+        if (shudanValue === '2') {
+            // 横のテキストボックスが未入力かチェック
+            if (shudan2Value === '') {
+                alert('手段が「その他」の場合は、詳細を入力してください。');
+                shudan2Input.focus(); // テキストボックスにフォーカス
+                return false; // フォーム送信を停止
+            }
+        }
+    }
+    
+    return true; // バリデーション通過、フォーム送信を許可
+}
+</script>

@@ -4,6 +4,8 @@ use Cake\ORM\Table;
 use cake\ORM\TableRegistry;
 use App\Controller\AppController;
 
+use Cake\Log\Log;
+
 class RemotesController extends AppController
 {    
     public function indexn()
@@ -55,6 +57,7 @@ class RemotesController extends AppController
                     return $this->redirect(['action'=>'indexn']);
                 }
             }
+
             if($data["type"]==0) {
                 $hinichi = $data["year"]."-".$data["month"]."-".$data["date"];
                 $this->request->getSession()->write([
@@ -64,6 +67,8 @@ class RemotesController extends AppController
                     'Remid' => $data["user_id"]
                 ]);
                 return $this->redirect(['action'=>'edit']);
+
+            //週間記録登録
             } elseif($data["type"]==1) {
                 $hinichi = $data["year"]."-".$data["month"]."-".$data["date"];
                 $this->request->getSession()->write([
@@ -72,7 +77,10 @@ class RemotesController extends AppController
                     'Weedate' => $data["date"],
                     'Weeid' => $data["user_id"]
                 ]);
+
                 return $this->redirect(['action'=>'editn']);
+            
+            //在宅就労記録一覧
             } elseif($data["type"]==2) {
                 $this->request->getSession()->write([
                     'Ichyear' => $data["year"],
@@ -230,10 +238,8 @@ class RemotesController extends AppController
                 }
             }
             $shudan = ["電話","通所","その他"];
-            $gyakushudan[0] = "電話";
-            $gyakushudan[1] = "通所";
             $this->set(compact("user","user_id","year","month","date","getstaffs","staff",
-                               "shudan","getworks","zen","gyakushudan","getthis","hajime","owari","maeda"));
+                               "shudan","getworks","zen","getthis","hajime","owari","maeda"));
         } else {
             $this->Flash->error(__('アクセス権限がありません'));
             return $this->redirect(['controller'=>'users','action'=>'login']);
@@ -341,9 +347,12 @@ class RemotesController extends AppController
             $weekly->hdate = $data["hyear"]."-".$hmonth."-".$data["hdate"];
             $weekly->odate = $data["oyear"]."-".$omonth."-".$data["odate"];
             $weekly->content = $data["content"];
+            if($data["shudan"] == 2) {
+                $weekly->shudan = $data["shudan"] . " " . $data["shudan2"];
+            }
 
             if($weeklyTable->save($weekly)){
-                $this->Flash->success(__('在宅就労記録が登録されました'));
+                $this->Flash->success(__('在宅就労週間記録が登録されました'));
                 return $this->redirect(['controller'=>'Users','action'=>'ichiran']);
             } else {
                 $this->Flash->error(__('データの登録に失敗しました'));
@@ -399,6 +408,7 @@ class RemotesController extends AppController
                                     'Remotes.date >='=>date('Y-m-d',$timestamp),
                                     'Remotes.date <='=>date('Y-m-d',$timestamp2)]))
                            ->toArray();
+        
 
         $getweeklies = $weeklyTable
         ->find()
@@ -407,6 +417,7 @@ class RemotesController extends AppController
                  'Weeklies.jdate <='=>date('Y-m-d',$timestamp2)])
         ->EnableHydration(false)
         ->toArray();
+
         $this->set(compact("years","months","year","month","user_id","users","staffs","weekList",
                            "getremotes","getweeklies","remotes"));
     }
