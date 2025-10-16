@@ -422,6 +422,110 @@ class RemotesController extends AppController
                            "getremotes","getweeklies","remotes"));
     }
 
+    public function checkRemoteWorkData()
+    {
+        $jsondata = $this->request->getData();
+        $this->viewBuilder()->setClassName('Json');
+        $this->set([
+            'data' => $jsondata,
+            '_serialize' => ['data'],
+        ]);
+        
+        $year = $jsondata['year'];
+        $month = $jsondata['month'];
+        $date = $jsondata['date'];
+        $user_id = $jsondata['user_id'];
+        
+        // 日付の妥当性チェック
+        if (empty($year) || empty($month) || empty($date) || empty($user_id)) {
+            $result = [
+                'success' => false,
+                'message' => '必要な情報が不足しています'
+            ];
+        } else {
+            // 日付の存在チェック
+            $timestamp = mktime(0, 0, 0, $month, $date, $year);
+            if ($timestamp === false || date('Y-m-d', $timestamp) !== sprintf('%04d-%02d-%02d', $year, $month, $date)) {
+                $result = [
+                    'success' => false,
+                    'message' => '存在しない日付です'
+                ];
+            } else {
+                // 日報データの存在確認と在宅フラグの確認（Attendancesテーブルで確認）
+                $attendanceTable = TableRegistry::get('Attendances');
+                
+                // Attendancesテーブルで日報データの存在確認
+                $attendanceData = $attendanceTable
+                    ->find()
+                    ->where([
+                        'Attendances.user_id' => $user_id,
+                        'Attendances.date' => date('Y-m-d', $timestamp)
+                    ])
+                    ->first();
+                
+                if (empty($attendanceData)) {
+                    $result = [
+                        'success' => true,
+                        'hasReport' => false,
+                        'isRemote' => false,
+                        'isHoliday' => false,
+                        'isAbsent' => false,
+                        'message' => '指定した日付の日報データが存在しません'
+                    ];
+                } else {
+                    // 公休・欠勤のチェック
+                    $isHoliday = isset($attendanceData->koukyu) && $attendanceData->koukyu == 1;
+                    $isAbsent = isset($attendanceData->kekkin) && $attendanceData->kekkin == 1;
+                    $isRemote = $attendanceData->remote == 1;
+                    
+                    if ($isHoliday) {
+                        $result = [
+                            'success' => true,
+                            'hasReport' => true,
+                            'isRemote' => false,
+                            'isHoliday' => true,
+                            'isAbsent' => false,
+                            'message' => '日報データは存在しますが、公休として登録されています'
+                        ];
+                    } elseif ($isAbsent) {
+                        $result = [
+                            'success' => true,
+                            'hasReport' => true,
+                            'isRemote' => false,
+                            'isHoliday' => false,
+                            'isAbsent' => true,
+                            'message' => '日報データは存在しますが、欠勤として登録されています'
+                        ];
+                    } elseif (!$isRemote) {
+                        $result = [
+                            'success' => true,
+                            'hasReport' => true,
+                            'isRemote' => false,
+                            'isHoliday' => false,
+                            'isAbsent' => false,
+                            'message' => '日報データは存在しますが、在宅勤務として登録されていません'
+                        ];
+                    } else {
+                        $result = [
+                            'success' => true,
+                            'hasReport' => true,
+                            'isRemote' => true,
+                            'isHoliday' => false,
+                            'isAbsent' => false,
+                            'message' => '日報データが存在し、在宅勤務として登録されています'
+                        ];
+                    }
+                }
+            }
+        }
+        
+        // 結果を設定
+        $this->set([
+            'data' => $result,
+            '_serialize' => ['data'],
+        ]);
+    }
+
     public function delete($id = null)
     {
         $query = $this->request->getQuery();

@@ -75,6 +75,42 @@
             return null; // エラーなし
         }
         
+        // 日報データの存在確認を行うAjax関数
+        function checkReportData(year, month, date, userId, callback) {
+            var jsondata = {
+                "year": year,
+                "month": month,
+                "date": date,
+                "user_id": userId
+            };
+
+            var csrf = $('input[name=_csrfToken]').val();
+            
+            $.ajax({
+                'url'	:"<?php echo $this->Url->build(["controller" => "Remotes","action" => "checkRemoteWorkData","ajax" => true], true); ?>",
+                'type': 'POST',
+                'beforeSend': function(xhr){
+                    xhr.setRequestHeader('X-CSRF-Token', csrf);
+                },
+                'async': false,
+                'data': jsondata,
+                'success': function(result){
+                    if (callback) {
+                        callback(result);
+                    }
+                },
+                'error': function(status){
+                    if (callback) {
+                        callback({
+                            success: false,
+                            message: 'サーバーエラーが発生しました'
+                        });
+                    }
+                }
+            });
+        }
+        
+        
         // フォーム送信時のバリデーション
         $('form').on('submit', function(e) {
             var form = $(this);
@@ -82,6 +118,7 @@
             var year = form.find('select[name="year"]').val();
             var month = form.find('select[name="month"]').val();
             var date = form.find('select[name="date"]').val();
+            var userId = form.find('select[name="user_id"]').val();
             
             // 在宅就労記録一覧（type=2）の場合は日付チェックをスキップ
             if (type === '2') {
@@ -89,7 +126,7 @@
             }
             
             // 日付が選択されている場合のみチェック
-            if (year && month && date) {
+            if (year && month && date && userId) {
                 var validationResult = validateDate(year, month, date);
                 if (validationResult !== true) {
                     var registrationType = getRegistrationType(form);
@@ -105,6 +142,45 @@
                     e.preventDefault();
                     return false;
                 }
+                
+                // 日報データの存在確認
+                e.preventDefault(); // 一旦送信を停止
+                
+                checkReportData(year, month, date, userId, function(response) {
+                    var data = response.data;
+                    if (data.success) {
+                        if (!data.hasReport) {
+                            // 日報データがない場合
+                            var registrationType = getRegistrationType(form);
+                            var errorMessage = registrationType + '：指定した日付の出勤簿データが存在しません。先に出勤簿を登録してください。';
+                            alert(errorMessage);
+                        } else if (data.isHoliday) {
+                            // 公休として登録されている場合
+                            var registrationType = getRegistrationType(form);
+                            var errorMessage = registrationType + '：指定された日付は公休になっています。';
+                            alert(errorMessage);
+                        } else if (data.isAbsent) {
+                            // 欠勤として登録されている場合
+                            var registrationType = getRegistrationType(form);
+                            var errorMessage = registrationType + '：指定された日付は欠勤になっています。';
+                            alert(errorMessage);
+                        } else if (!data.isRemote && type !== '1') {
+                            // 日報データはあるが在宅勤務として登録されていない場合（週間記録登録以外）
+                            var registrationType = getRegistrationType(form);
+                            var errorMessage = registrationType + '：指定された日付は出勤簿で在宅勤務になっていません。';
+                            alert(errorMessage);
+                        } else {
+                            // 日報データも在宅勤務フラグもある場合は通常の送信処理を実行
+                            // または週間記録登録の場合は在宅勤務でなくてもOK
+                            form.off('submit').submit();
+                        }
+                    } else {
+                        // サーバーエラーの場合
+                        alert('データの確認中にエラーが発生しました：' + data.message);
+                    }
+                });
+                
+                return false;
             }
         });
     });

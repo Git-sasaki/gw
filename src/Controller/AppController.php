@@ -79,7 +79,7 @@ class AppController extends Controller
         $this->Auth->allow(['login','logout','index','add','delete','index2','register','register2','list','view','edit',
         'edit2','update','stamp','stamp2','calendar','hiddencommand','printout','test','export','report','viewdetail',
         'excelexport','service','attendance','report','spdf','updf','umpdf','getquery0','getquery1','indexn','settings',
-        'default','dregister','absent','srecords','csv','schedule','scheduleAjax','stampn','editn','detailn','hoken',
+        'default','dregister','absent','srecords','csv','schedule','scheduleAjax','checkRemoteWorkData','stampn','editn','detailn','hoken',
         'ichiran','newn','registern','nisshis','remote','jisseki','support','chouka','sanchouka','kokodozo','pdf','new',
         'syokuji','syukkinhyou','kissyokuhyou','sougeiexcel','sougeiregister','sougeikirokubo']);
     }
