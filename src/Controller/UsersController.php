@@ -191,11 +191,15 @@ class UsersController extends AppController
 
     public function editn()
     {
-        $id = $this->request->getData('id');
+        // 通常の編集処理（POST）とエラー時の編集処理（GET）の両方に対応
+        $id = $this->request->getData('id') ?: $this->request->getQuery('id');
         $attendanceTable = TableRegistry::get('Attendances');
         $timestamp = mktime(0,0,0,date('m'),1,date('Y'));
 
         $user = $this->Users->find()->where(['Users.id'=>$id])->first();
+        if (empty($user)) {
+            throw new \Exception('ユーザーが見つかりません');
+        }
         $firstname = explode("　",$user["name"]);
         if(!empty($user["joined"])) {
             $joined = explode("/",$user["joined"]->i18nFormat('MM/dd/yyyy'));
@@ -761,62 +765,99 @@ class UsersController extends AppController
             } elseif($type == 2) {
                 $data = $this->request->getData();
                 $user_id = $this->request->getQuery('id');
-                $name = $data["lastname"]."　".$data["firstname"];
-                $user = $this->Users->get($user_id);
-                $user->user = $data["user"];
-                $user->name = $name;
-                $user->adminfrag = $data["adminfrag"];
-                $user->lastname = $data["lastname"];
-                $user->sapporo = ($data["adminfrag"] == 0) ? (array_key_exists('sapporo', $data) ? $data["sapporo"] : null) : null;
-                $user->wrkCase = ($data["adminfrag"] == 0) ? $data["wrkCase"] : null;
-                $user->mail = ($data["adminfrag"] == 0) ? null : $data["mailaddress"];
-                $user->kessai = ($data["adminfrag"] == 0) ? null : (array_key_exists('kessai', $data) ? $data["kessai"] : null);
-                $user->oufuku_place = $data["oufuku_place"];
-                if(empty($data["narabi"]) && empty($data["retired"])) {
-                    if($data["adminfrag"] == 1) {
-                        $user->narabi = 1;
-                    } else {
-                        $user->narabi = 10;
-                    }
-                } elseif(strtotime($data["retired"]) < time()) {
-                    $user->narabi = 999;
-                }
-                if(empty($data["jyear"]) || empty($data["jmonth"]) || empty($data["jdate"])) {
-                    $this->Flash->error(__('入社日に空欄があります'));
+                
+                // CakePHPのトランザクション処理
+                // エラーレベルを一時的に変更してUndefined indexを例外として扱う
+                $old_error_reporting = error_reporting(E_ALL);
+                set_error_handler(function($severity, $message, $file, $line) {
+                    throw new \ErrorException($message, 0, $severity, $file, $line);
+                });
+                
+                try {
+                    $this->Users->getConnection()->transactional(function ($connection) use ($data, $user_id) {
+                        $name = $data["lastname"]."　".$data["firstname"];
+                        $user = $this->Users->get($user_id);
+                        
+                        $user->user = $data["user"];
+                        $user->name = $name;
+                        $user->adminfrag = $data["adminfrag"];
+                        
+                        $user->lastname = $data["lastname"];
+                        $user->sapporo = ($data["adminfrag"] == 0) ? (array_key_exists('sapporo', $data) ? $data["sapporo"] : null) : null;
+                        $user->wrkCase = ($data["adminfrag"] == 0) ? $data["wrkCase"] : null;
+                        $user->mail = ($data["adminfrag"] == 0) ? null : $data["mailaddress"];
+                        $user->kessai = ($data["adminfrag"] == 0) ? null : (array_key_exists('kessai', $data) ? $data["kessai"] : null);
+                        
+                        // 送迎場所が変更されたかチェック
+                        $old_oufuku_place = $user->oufuku_place;
+                        $user->oufuku_place = $data["oufuku_place"];
+                        
+                        if(empty($data["narabi"]) && empty($data["retired"])) {
+                            if($data["adminfrag"] == 1) {
+                                $user->narabi = 1;
+                            } else {
+                                $user->narabi = 10;
+                            }
+                        } elseif(strtotime($data["retired"]) < time()) {
+                            $user->narabi = 999;
+                        }
+                        
+                        if(empty($data["jyear"]) || empty($data["jmonth"]) || empty($data["jdate"])) {
+                            throw new \Exception('入社日に空欄があります');
+                        } else {
+                            $jstamp = mktime(0,0,0,$data["jmonth"],$data["jdate"],$data["jyear"]);
+                            $joined = date('Y-m-d',$jstamp);
+                            $user->joined = $joined;
+                        }
+                        
+                        if(!empty($data["sjnumber"])) {
+                            $user->sjnumber = $data["sjnumber"];
+                            if(!empty($data["sjhyear"]) && !empty($data["sjhmonth"]) && !empty($data["sjhdate"])) {
+                                $sjh = mktime(0,0,0,$data["sjhmonth"],$data["sjhdate"],$data["sjhyear"]);
+                                $sjhajime = date('Y-m-d',$sjh);
+                            }
+                            if(!empty($data["sjoyear"]) && !empty($data["sjomonth"]) && !empty($data["sjodate"])) {
+                                $sjo = mktime(0,0,0,$data["sjomonth"],$data["sjodate"],$data["sjoyear"]);
+                                $sjowari = date('Y-m-d',$sjo);
+                            }
+                            if(!empty($sjhajime) && !empty($sjowari)) {
+                                $user->sjhajime = $sjhajime;
+                                $user->sjowari = $sjowari;
+                            } elseif(!empty($sjhajime) && empty($sjowari)) {
+                                throw new \Exception('受給者証期限のどちらかに空欄があります');
+                            } elseif(empty($sjhajime) && !empty($sjowari)) {
+                                throw new \Exception('受給者証期限のどちらかに空欄があります');
+                            }
+                        }
+            
+                        if(!$this->Users->save($user)) {
+                            throw new \Exception('ユーザーの保存に失敗しました');
+                        }
+                        
+                        // 送迎場所が変更された場合、transportsテーブルを更新
+                        if ($old_oufuku_place != $data["oufuku_place"]) {
+                            $this->updateTransportsForUser($user_id, $data["oufuku_place"]);
+                        }
+                        
+                        return true;
+                    });
+                    
+                    // エラーハンドラーを元に戻す
+                    restore_error_handler();
+                    error_reporting($old_error_reporting);
+                    
+                    // トランザクションが成功した場合
+                    $this->Flash->success(__('ユーザーが更新されました'));
                     return $this->redirect(['action' => 'indexn']);
-                } else {
-                    $jstamp = mktime(0,0,0,$data["jmonth"],$data["jdate"],$data["jyear"]);
-                    $joined = date('Y-m-d',$jstamp);
-                    $user->joined = $joined;
-                }
-                if(!empty($data["sjnumber"])) {
-                    $user->sjnumber = $data["sjnumber"];
-                    if(!empty($data["sjhyear"]) && !empty($data["sjhmonth"]) && !empty($data["sjhdate"])) {
-                        $sjh = mktime(0,0,0,$data["sjhmonth"],$data["sjhdate"],$data["sjhyear"]);
-                        $sjhajime = date('Y-m-d',$sjh);
-                    }
-                    if(!empty($data["sjoyear"]) && !empty($data["sjomonth"]) && !empty($data["sjodate"])) {
-                        $sjo = mktime(0,0,0,$data["sjomonth"],$data["sjodate"],$data["sjoyear"]);
-                        $sjowari = date('Y-m-d',$sjo);
-                    }
-                    if(!empty($sjhajime) && !empty($sjowari)) {
-                        $user->sjhajime = $sjhajime;
-                        $user->sjowari = $sjowari;
-                    } elseif(!empty($sjhajime) && empty($sjowari)) {
-                        $this->Flash->error(__('受給者証期限のどちらかに空欄があります'));
-                        return $this->redirect(['action' => 'indexn']);
-                    } elseif(empty($sjhajime) && !empty($sjowari)) {
-                        $this->Flash->error(__('受給者証期限のどちらかに空欄があります'));
-                        return $this->redirect(['action' => 'indexn']);
-                    }
-                }
-    
-                if($this->Users->save($user)) {
-                    $this->Flash->success(__('ユーザーが追加されました'));
-                    return $this->redirect(['action' => 'indexn']);
-                } else {
-                    $this->Flash->error('ユーザーの登録に失敗しました');     
-                    return $this->redirect(['action' => 'indexn']);  
+                    
+                } catch (\Exception $e) {
+                    // エラーハンドラーを元に戻す
+                    restore_error_handler();
+                    error_reporting($old_error_reporting);
+                    
+                    // トランザクションが失敗した場合（自動的にロールバックされる）
+                    $this->Flash->error(__($e->getMessage()));
+                    return $this->redirect(['action' => 'editn', 'id' => $user_id]);
                 }
             //退職処理
             } elseif($type == 3) {
@@ -871,6 +912,36 @@ class UsersController extends AppController
                 ];
             }
             echo json_encode($response);
+        }
+    }
+
+    /**
+     * 送迎場所が変更された場合、該当ユーザーの未完了送迎記録を更新
+     */
+    private function updateTransportsForUser($user_id, $new_place)
+    {
+        $transportsTable = $this->getTableLocator()->get('Transports');
+                
+        // 当日以降でまだ送迎が終わっていないレコードを取得
+        $transports = $transportsTable->find()
+            ->where([
+                'user_id' => $user_id,
+                'date >=' => date('Y-m-d'),
+                'taykutime IS' => null  // 到着時間が未設定（送迎未完了）
+            ])
+            ->toArray();
+        
+        // 各送迎記録の場所を更新（kindに応じて適切なフィールドを更新）
+        foreach ($transports as $transport) {
+            if ($transport->kind == 1) {
+                // kind=1（迎え）の場合：hatsuplace（出発場所）を更新
+                $transport->hatsuplace = $new_place;
+            } elseif ($transport->kind == 2) {
+                // kind=2（送り）の場合：tyakuplace（到着場所）を更新
+                $transport->tyakuplace = $new_place;
+            }
+            $transport->modified = date('Y-m-d H:i:s');
+            $transportsTable->save($transport);
         }
     }
 }

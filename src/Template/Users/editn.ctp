@@ -369,6 +369,7 @@
         <div class = "w80 ml10"> 
             <?php $kubun = array("利用者", '職員'); ?>
             <?= $this->form->input( 'adminfrag',array('label'=>'区分','type' => 'select', 'options' => $kubun, 'value'=>$user["adminfrag"], 'disabled' => true)); ?>
+            <?= $this->Form->hidden('adminfrag', ['value' => $user["adminfrag"]]); ?>
         </div>
         <div class = "w80 ml10" id="wrkCase_div" <?= ($user["adminfrag"] == 1) ? 'style="display:none;"' : '' ?>>
             <?php
