@@ -261,10 +261,12 @@
                     </tbody>
                 </table>
                 <div>
+                    <!--
                     <?= $this->Form->create(null, [
                         'url' => ['controller' => 'Sougei', 'action' => 'sougeiexcel'],
                         'id' => 'sougeiForm'
                     ]) ?>
+                    -->
 
                     <?php
                         $SougeiData = isset($SougeiData) ? $SougeiData : json_encode([]);
@@ -275,9 +277,11 @@
                             'value' => $SougeiData
                         ]);
                     ?>
+                    <!--
                     <?= $this->Form->button(__('出力'), ['id' => 'modalsougeibutton', 'class' => 'custom-btn']) ?>
                     <?= $this->Form->end() ?>
-                </div>
+                    -->
+                    </div>
             </div>
         </div>
     </fieldset>
