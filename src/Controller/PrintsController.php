@@ -449,6 +449,17 @@ class PrintsController extends AppController
             $attendanceTable = TableRegistry::get('Attendances');
             $jigyoushasTable = TableRegistry::get('Jigyoushas');
             $data = $this->request->getData();
+            $workType = isset($data['work_type']) ? (int)$data['work_type'] : 0;
+            if (!in_array($workType, [0, 1], true)) {
+                $workType = 0;
+            }
+            $session = $this->request->getSession();
+            $session->write([
+                'eyear' => $data["year"],
+                'emonth' => $data["month"],
+                'euser_id' => $data["user_id"],
+                'work_type' => (string)$workType,
+            ]);
             $timestamp = mktime(0,0,0,$data["month"],1,$data["year"]);
             $holidays = \Yasumi\Yasumi::create('Japan', $data["year"], 'ja_JP');
             $weekday = ['日','月','火','水','木','金','土'];
@@ -465,7 +476,10 @@ class PrintsController extends AppController
                 $users = [];
                 $getusers = $usersTable
                 ->find()
-                ->where(['Users.adminFrag'=>0])
+                ->where([
+                    'Users.adminFrag'=>0,
+                    'Users.wrkCase' => $workType
+                ])
                 ->order(['Users.narabi'=>'ASC','Users.id'=>'ASC'])
                 ->toArray();
                 foreach($getusers as $getuser) {
@@ -489,12 +503,18 @@ class PrintsController extends AppController
             } else {
                 $users = $usersTable
                 ->find()
-                ->where(['Users.id' => $data["user_id"]])
+                ->where([
+                    'Users.id' => $data["user_id"],
+                    'Users.wrkCase' => $workType
+                ])
                 ->order(['Users.narabi'=>'ASC','Users.id'=>'ASC'])
                 ->toArray();
                 $name = $usersTable
                 ->find('list',['valueField'=>'name'])
-                ->where(['Users.id' => $data["user_id"]])
+                ->where([
+                    'Users.id' => $data["user_id"],
+                    'Users.wrkCase' => $workType
+                ])
                 ->first();
             }
 
@@ -505,7 +525,8 @@ class PrintsController extends AppController
                 ->select(['Attendances.intime'])
                 ->where(['Attendances.user_id' => $user["id"], 
                          'Attendances.date >=' => date('Y-m',$timestamp).'-01', 
-                         'Attendances.date <=' => date('Y-m',$timestamp)."-".date("t",$timestamp)])
+                         'Attendances.date <=' => date('Y-m',$timestamp)."-".date("t",$timestamp),
+                         'Attendances.user_type' => $workType])
                 ->order(['Attendances.date'=>'ASC'])
                 ->toArray();
                 if(!empty($attcheck)) {
@@ -554,7 +575,8 @@ class PrintsController extends AppController
                     $result = $attendanceTable
                     ->find()
                     ->where(['Attendances.user_id' => $attuser["id"], 
-                             'Attendances.date >=' => date('Y-m',$timestamp)."-".$i])
+                             'Attendances.date >=' => date('Y-m',$timestamp)."-".$i,
+                             'Attendances.user_type' => $workType])
                     ->order(['Attendances.date'=>'ASC'])
                     ->first();
 
@@ -639,7 +661,8 @@ class PrintsController extends AppController
                 $sums = $query
                 ->where(['Attendances.user_id' => $attuser["id"], 
                          'Attendances.date >=' => date('Y-m',$timestamp).'-01', 
-                         'Attendances.date <=' => date('Y-m',$timestamp)."-".date("t",$timestamp)])
+                         'Attendances.date <=' => date('Y-m',$timestamp)."-".date("t",$timestamp),
+                         'Attendances.user_type' => $workType])
                 ->select([
                     'sumou' => $query->func()->sum('Attendances.ou'),
                     'sumfuku' => $query->func()->sum('Attendances.fuku'),

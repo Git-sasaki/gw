@@ -53,7 +53,7 @@
     <div class = "odakoku">
         <div class = "shutsuryoku">
             <h4 class = "exportdeka">出勤簿(利用者)PDF印刷</h4>
-            <?= $this->Form->create(__("View"),["type" => "post","url" => ["controller" => "pdfs", "action" => "getquery0"]]); ?>
+            <?= $this->Form->create(__("View"),["type" => "post","url" => ["controller" => "pdfs", "action" => "getquery0"],'id' => 'pdf-user-form']); ?>
             <?= $this->Form->control('hidden',['type'=>'hidden','value'=>0]) ?>
             <h4 class = "exportchibi">年月日選択</h4>
                 <div class = "odakoku mlv25">
@@ -61,28 +61,24 @@
                     <?php 
                     $uyear = $this->request->getSession()->read('uyear');
                     $uyear_value = ($uyear !== null && $uyear !== '') ? $uyear : date("Y");
-                    // デバッグ用：セッション値を表示
-                    echo "<!-- Debug: uyear=" . var_export($uyear, true) . ", uyear_value=" . var_export($uyear_value, true) . " -->";
                     ?>
-                    <?= $this->Form->control('year',['type'=>'select','label'=>"年",'value'=>$uyear_value,'onchange'=>'updateUsersList()'], $years) ?>
+                    <?= $this->Form->control('year',['type'=>'select','id'=>'pdf_year','data-role'=>'year','label'=>"年",'value'=>$uyear_value,'onchange'=>'updateUsersList("pdf-user-form")'], $years) ?>
                 </div>
                 <div class = "sdakoku">
                     <?php 
                     $umonth = $this->request->getSession()->read('umonth');
                     $umonth_value = ($umonth !== null && $umonth !== '') ? $umonth : date("m");
-                    // デバッグ用：セッション値を表示
-                    echo "<!-- Debug: umonth=" . var_export($umonth, true) . ", umonth_value=" . var_export($umonth_value, true) . " -->";
                     ?>
-                    <?= $this->Form->control('month',['type'=>'select','label'=>"月",'value'=>$umonth_value,'onchange'=>'updateUsersList()'], $months) ?>
+                    <?= $this->Form->control('month',['type'=>'select','id'=>'pdf_month','data-role'=>'month','label'=>"月",'value'=>$umonth_value,'onchange'=>'updateUsersList("pdf-user-form")'], $months) ?>
                 </div>
             </div>
              <div class = "odakoku mlv25">
                  <div class = "sdakoku" style="width: 135px;">
                      <h4 class = "exportchibi" style="margin-left: 0; padding-left: 0;">ユーザー</h4>
                      <?php if(empty($this->request->getSession()->read('uuser_id'))): ?>
-                         <?= $this->Form->select('id',$users,['id'=>'user_id','label' => false,'empty'=>array('0'=>'ALL')]);?>
+                         <?= $this->Form->select('id',$users,['id'=>'pdf_user_id','data-role'=>'user','label' => false,'empty'=>array('0'=>'ALL')]);?>
                      <?php else: ?>
-                         <?= $this->Form->select('id',$users,['id'=>'user_id','label' => false,'empty'=>array('0'=>'ALL'),'value'=>$this->request->getSession()->read('uuser_id')]);?>
+                         <?= $this->Form->select('id',$users,['id'=>'pdf_user_id','data-role'=>'user','label' => false,'empty'=>array('0'=>'ALL'),'value'=>$this->request->getSession()->read('uuser_id')]);?>
                      <?php endif; ?>
                  </div>
                  <div class = "sdakoku" style="width: 120px; padding-left: 20px;">
@@ -94,11 +90,12 @@
                          '0' => 'A型',
                          '1' => 'B型'
                      ], [
-                         'id' => 'work_type',
+                         'id' => 'pdf_work_type',
+                         'data-role' => 'work-type',
                          'label' => false,
                          'value' => $work_type,
                          'default' => '0',
-                         'onchange' => 'updateUsersList()'
+                         'onchange' => 'updateUsersList("pdf-user-form")'
                      ]); ?>
                  </div>
              </div>
@@ -144,19 +141,53 @@
         </div>
         <div class = "shutsuryoku">
             <h4 class = "exportdeka">出勤簿(利用者)Excel出力</h4>
-            <?= $this -> Form -> create(__("View"),["type" => "post","url" => ["action" => "view"]]); ?>
+            <?= $this -> Form -> create(__("View"),["type" => "post","url" => ["action" => "view"],'id' => 'excel-user-form']); ?>
             <h4 class = "exportchibi">年月日選択</h4>
                 <div class = "odakoku mlv25">
                     <div class = "sdakoku">
-                    <?= $this->Form->control('year',['type'=>'select','label'=>"年",'value'=>date("Y")], $years) ?>
+                    <?php 
+                    $excelYear = $this->request->getSession()->read('eyear');
+                    $excelYearValue = ($excelYear !== null && $excelYear !== '') ? $excelYear : date("Y");
+                    ?>
+                    <?= $this->Form->control('year',['type'=>'select','id'=>'excel_year','data-role'=>'year','label'=>"年",'value'=>$excelYearValue,'onchange'=>'updateUsersList("excel-user-form")'], $years) ?>
                     </div>
                     <div class = "sdakoku">
-                        <?= $this->Form->control('month',['type'=>'select','label'=>"月",'value'=>date("m")], $months) ?> 
+                        <?php 
+                        $excelMonth = $this->request->getSession()->read('emonth');
+                        $excelMonthValue = ($excelMonth !== null && $excelMonth !== '') ? $excelMonth : date("m");
+                        ?>
+                        <?= $this->Form->control('month',['type'=>'select','id'=>'excel_month','data-role'=>'month','label'=>"月",'value'=>$excelMonthValue,'onchange'=>'updateUsersList("excel-user-form")'], $months) ?> 
                     </div>
                 </div>
-                <h4 class = "exportchibi">ユーザー</h4>  
-                <div class = "staffbox mlv25">
-                    <?= $this->Form->select('user_id',$users,array('id'=>'staff_id','label' => false,'empty'=>array('0'=>'ALL')));?>
+
+
+
+                <div class = "odakoku mlv25">
+                    <div class = "sdakoku" style="width: 135px;">
+                     <h4 class = "exportchibi" style="margin-left: 0; padding-left: 0;">ユーザー</h4>
+                     <?php 
+                        $excelUserId = $this->request->getSession()->read('euser_id');
+                        $excelUserValue = ($excelUserId === null || $excelUserId === '') ? '0' : (string)$excelUserId;
+                        ?>
+                        <?= $this->Form->select('user_id',$users,['id'=>'excel_user_id','data-role'=>'user','label' => false,'empty'=>['0'=>'ALL'],'value'=>$excelUserValue]);?>
+                    </div>
+                    <div class = "sdakoku" style="width: 120px; padding-left: 20px;">
+                        <h4 class = "exportchibi" style="margin-left: 0; padding-left: 0;">就労タイプ</h4>
+                        <?php 
+                        $excel_work_type = $this->request->getSession()->read('work_type') ?: '0';
+                        ?>
+                        <?= $this->Form->select('work_type',[
+                            '0' => 'A型',
+                            '1' => 'B型'
+                        ],[
+                            'id' => 'excel_work_type',
+                            'data-role' => 'work-type',
+                            'label' => false,
+                            'value' => $excel_work_type,
+                            'default' => '0',
+                            'onchange' => 'updateUsersList("excel-user-form")'
+                        ]); ?>
+                    </div>
                 </div>
             <div class="mt10_button mt20 mlv25">
                 <?= $this->Form->button(__("表示")) ?>
@@ -628,20 +659,25 @@
 
 <script>
 /**
- * 指定年月と就労タイプに基づいて利用者リストを更新
+ * 指定フォームの年月と就労タイプに基づいて利用者リストを更新
+ * @param {string} formId 更新対象フォームのID
  */
-function updateUsersList() {
-    // 出勤簿(利用者)PDF印刷のフォーム内の要素を検索
-    const form = document.querySelector('form[action*="pdfs/getquery0"]');
+function updateUsersList(formId) {
+    if (!formId) {
+        console.error('フォームIDが指定されていません');
+        return;
+    }
+
+    const form = document.getElementById(formId);
     if (!form) {
-        console.error('出勤簿(利用者)PDF印刷のフォームが見つかりません');
+        console.error(`ID:${formId} のフォームが見つかりません`);
         return;
     }
     
-    const yearSelect = form.querySelector('select[name="year"]');
-    const monthSelect = form.querySelector('select[name="month"]');
-    const workTypeSelect = form.querySelector('select[name="work_type"]');
-    const userSelect = form.querySelector('select[name="id"]');
+    const yearSelect = form.querySelector('select[data-role="year"]');
+    const monthSelect = form.querySelector('select[data-role="month"]');
+    const workTypeSelect = form.querySelector('select[data-role="work-type"]');
+    const userSelect = form.querySelector('select[data-role="user"]');
     const submitButton = form.querySelector('button[type="submit"]');
     
     if (!yearSelect || !monthSelect || !workTypeSelect || !userSelect || !submitButton) {
@@ -653,11 +689,14 @@ function updateUsersList() {
     const month = monthSelect.value;
     const workType = workTypeSelect.value;
     
+    userSelect.disabled = true;
+    submitButton.disabled = true;
+    
     // 現在選択されている利用者IDを保存
     const currentUserId = userSelect.value;
     
     // CSRFトークンを取得（Calendars/indexn.ctpと同じ方法）
-    const csrfToken = document.querySelector('input[name="_csrfToken"]')?.value || '';
+    const csrfToken = form.querySelector('input[name="_csrfToken"]')?.value || document.querySelector('input[name="_csrfToken"]')?.value || '';
     
     // AJAXリクエストを送信
     fetch('<?= $this->Url->build(["controller" => "Prints", "action" => "getUsersByDateAndWorkType"], true) ?>', {
@@ -703,6 +742,14 @@ function updateUsersList() {
             userSelect.disabled = false;
             submitButton.disabled = false;
             
+            const hasAllInData = Object.prototype.hasOwnProperty.call(data, '0');
+            if (!hasAllInData) {
+                const allOption = document.createElement('option');
+                allOption.value = '0';
+                allOption.textContent = 'ALL';
+                userSelect.appendChild(allOption);
+            }
+            
             Object.keys(data).forEach(userId => {
                 const option = document.createElement('option');
                 option.value = userId;
@@ -711,7 +758,7 @@ function updateUsersList() {
             });
             
             // 以前選択されていた利用者が新しいリストに存在する場合は選択状態を復元
-            if (currentUserId && data.hasOwnProperty(currentUserId)) {
+            if (currentUserId && (data.hasOwnProperty(currentUserId) || currentUserId === '0')) {
                 userSelect.value = currentUserId;
             } else {
                 // 存在しない場合はALLを選択
@@ -721,6 +768,9 @@ function updateUsersList() {
     })
     .catch(error => {
         console.error('AJAXリクエストでエラーが発生しました:', error);
+        // エラー時はフォーム操作を可能に戻す
+        userSelect.disabled = false;
+        submitButton.disabled = false;
     });
 }
 
@@ -728,7 +778,11 @@ function updateUsersList() {
 document.addEventListener('DOMContentLoaded', function() {
     // 少し遅延させてから初期化（フォーム要素が完全に読み込まれるのを待つ）
     setTimeout(function() {
-        updateUsersList();
+        ['pdf-user-form', 'excel-user-form'].forEach(function(formId) {
+            if (document.getElementById(formId)) {
+                updateUsersList(formId);
+            }
+        });
     }, 100);
 });
 </script>
