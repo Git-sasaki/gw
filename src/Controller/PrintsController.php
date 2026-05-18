@@ -2450,6 +2450,9 @@ class PrintsController extends AppController
         exit;
     }
 
+    //--------------------------------
+    //出勤表
+    //--------------------------------
     public function syukkinhyou() 
     {
         if($this->request-> getSession()->read('Auth.User.adminfrag') == 0) exit;
@@ -2469,9 +2472,9 @@ class PrintsController extends AppController
             $attendanceTable->find()->func()->date_format(['dintime' => 'identifier', "'%H:%i'" => 'literal']),
             '～',
             $attendanceTable->find()->func()->date_format(['douttime' => 'identifier', "'%H:%i'" => 'literal'])
-        ]),'user_id' => 'user_id','name' => 'name'])
+        ]),'user_id' => 'user_id','name' => 'name','joined' => 'users.joined'])
         ->join(['type' => 'inner', 'table' => 'users', 'conditions' => 'user_id = users.id'])
-        ->where(['date >=' => date('Y-m-d',$sdate),'date <=' => $edate,'adminfrag' => 0])
+        ->where(['date >=' => date('Y-m-d',$sdate),'date <=' => $edate,'users.retired IS' => null,'adminfrag' => 0])
         ->distinct(['user_id']) 
         ->order(['user_id' => 'ASC'])
         ->enableHydration(false)
@@ -2641,6 +2644,15 @@ class PrintsController extends AppController
             $sheet->setCellValueByColumnAndRow(2, $i + 4, $RiyousyaList[$i]['work_hours']);
             $sheet->setCellValueByColumnAndRow(3, $i + 4, $RiyousyaList[$i]['name']);
 
+            //入所日取得
+            $joinedStamp = null;
+            if (!empty($RiyousyaList[$i]['joined'])) {
+                $joined = $RiyousyaList[$i]['joined'];
+                $joinedStamp = is_object($joined)
+                    ? strtotime($joined->i18nFormat('yyyy-MM-dd'))
+                    : strtotime($joined);
+            }
+
             //出勤情報取得
             $RiyousyaSyukkin = $attendanceTable
             ->find()
@@ -2651,6 +2663,10 @@ class PrintsController extends AppController
     
             //出勤情報出力
             for ( $j = 0; $j < count($RiyousyaSyukkin); $j++) {
+                $day = (int)$RiyousyaSyukkin[$j]['day'];
+                if ($joinedStamp !== null && mktime(0, 0, 0, $data['month'], $day, $data['year']) < $joinedStamp) {
+                    continue;
+                }
                 if ( $RiyousyaSyukkin[$j]['remote'] == 1) {
                     $sheet->setCellValueByColumnAndRow(3 + $RiyousyaSyukkin[$j]['day'], $i + 4, '在');
                 } elseif ($RiyousyaSyukkin[$j]['support'] == 3) {
